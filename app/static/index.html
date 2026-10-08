@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tapo Watcher</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --surface: #ffffff; --surface-2: #eef0f3; --text: #1a1e24; --muted: #5d6877;
+    --border: #dfe3e8; --accent: #2457d6; --on-accent: #ffffff;
+    --ok: #157a3c; --warn: #a15c07; --bad: #b42318;
+    --phone: #0b6e85; --no-phone: #6d3fd1; --neutral: #5d6877; --on-badge: #ffffff;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116; --surface: #161a21; --surface-2: #1e232c; --text: #e5e8ed; --muted: #97a1af;
+      --border: #2a303b; --accent: #7aa2ff; --on-accent: #0e1116;
+      --ok: #5ad48a; --warn: #f2b84b; --bad: #ff8a80;
+      --phone: #5fd0e8; --no-phone: #c3a9ff; --neutral: #97a1af; --on-badge: #0e1116;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0 12px 0 0; }
+  .title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--neutral); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+  button { font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .55; cursor: default; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer; margin-right: 4px; }
+  #hidden-note { margin-top: 12px; }
+  .banner { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); margin-bottom: 16px; border-left: 4px solid var(--warn); }
+  .banner.bad { border-left-color: var(--bad); }
+  #live { margin-bottom: 20px; }
+  #live img { display: block; width: 100%; max-width: 960px; border-radius: 10px; background: #000; aspect-ratio: 16 / 9; object-fit: contain; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; }
+  .card:hover { border-color: var(--accent); }
+  .thumb { position: relative; aspect-ratio: 16 / 9; background: var(--surface-2); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .badge { position: absolute; left: 8px; top: 8px; padding: 2px 9px; border-radius: 6px; font-size: 13px; font-weight: 600; background: var(--neutral); color: var(--on-badge); }
+  .badge.phone { background: var(--phone); } .badge.no_phone { background: var(--no-phone); }
+  .badge.error, .badge.refused { background: var(--bad); } .badge.pending { background: var(--warn); }
+  .meta { padding: 8px 10px; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+  .meta strong { color: var(--text); font-weight: 600; }
+  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+  details { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details h3 { font-size: 14px; margin: 14px 0 6px; }
+  details ul { margin: 0; padding-left: 18px; font: 13px/1.6 ui-monospace, Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td code { font: 12px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+  .table-scroll { overflow-x: auto; }
+  dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 32px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); padding: 0; }
+  dialog::backdrop { background: rgb(0 0 0 / .55); }
+  .dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .dlg-head h2 { font-size: 16px; margin: 0; }
+  .dlg-body { padding: 16px; }
+  .dlg-body .hero { width: 100%; border-radius: 8px; background: #000; display: block; }
+  .bars { display: grid; grid-template-columns: 80px 1fr 48px; gap: 6px 10px; align-items: center; margin: 14px 0; font-size: 14px; }
+  .bar { height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--neutral); }
+  .bar .phone { background: var(--phone); } .bar .no_phone { background: var(--no-phone); }
+  .frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+  .frames figure { margin: 0; font-size: 12px; color: var(--muted); }
+  .frames img { width: 100%; border-radius: 6px; display: block; }
+  .frames figure.best img { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .note { color: var(--muted); font-size: 13px; }
+  .err { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <h1>Tapo watcher</h1>
+      <span class="chip"><span id="cam-dot" class="dot"></span><span id="cam-text">Connecting…</span></span>
+      <span class="chip" id="trigger-chip" hidden></span>
+      <span class="chip" id="ai-chip" hidden></span>
+    </div>
+    <div class="actions">
+      <label class="toggle"><input type="checkbox" id="people-only" checked> Only people</label>
+      <button id="live-btn" type="button">Live view</button>
+      <button id="capture-btn" class="primary" type="button">Capture now</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+  <section id="live" hidden><img id="live-img" alt="Live camera view"></section>
+
+  <main>
+    <div id="events" class="grid"></div>
+    <p id="hidden-note" class="note"></p>
+    <p id="empty" class="empty" hidden></p>
+  </main>
+
+  <details>
+    <summary>Diagnostics</summary>
+    <h3>Event topics the camera advertises</h3>
+    <ul id="topics"></ul>
+    <h3>Latest ONVIF messages</h3>
+    <div class="table-scroll">
+      <table><thead><tr><th>Time</th><th>Topic</th><th>Op</th><th>Data</th></tr></thead><tbody id="recent"></tbody></table>
+    </div>
+  </details>
+</div>
+
+<dialog id="detail">
+  <div class="dlg-head">
+    <h2 id="dlg-title"></h2>
+    <div class="actions">
+      <button id="dlg-delete" class="danger" type="button">Delete</button>
+      <button id="dlg-close" type="button">Close</button>
+    </div>
+  </div>
+  <div class="dlg-body" id="dlg-body"></div>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pct = (p) => (p == null ? "–" : Math.round(p * 100) + "%");
+const LABELS = { phone: "Using phone", no_phone: "No phone", unclear: "Unclear", no_person: "No person", refused: "Refused", error: "Error" };
+const TRIGGERS = { person: "Person detected", motion: "Motion", manual: "Manual" };
+
+let events = [];
+let lastEventsKey = "";
+let openId = null;
+
+function verdict(ev) {
+  if (ev.status === "capturing") return { cls: "pending", text: "Capturing…" };
+  if (ev.status === "analyzing") return { cls: "pending", text: "Analysing…" };
+  if (ev.status === "error") return { cls: "error", text: "Error" };
+  const a = ev.analysis;
+  if (!a) return { cls: "", text: "Captured" };
+  const text = LABELS[a.label] || a.label;
+  return { cls: a.label, text: a.probability != null ? `${text} ${pct(a.probability)}` : text };
+}
+
+function when(iso) {
+  const d = new Date(iso);
+  const day = d.toDateString() === new Date().toDateString() ? "Today" : d.toLocaleDateString();
+  return `${day} ${d.toLocaleTimeString()}`;
+}
+
+function renderEvents() {
+  const shown = $("#people-only").checked ? events.filter((ev) => ev.analysis?.label !== "no_person") : events;
+  const hidden = events.length - shown.length;
+  $("#empty").hidden = shown.length > 0;
+  $("#empty").textContent = events.length
+    ? "No pictures with a person yet."
+    : "No events yet. Pictures appear here automatically when the camera reports movement.";
+  $("#hidden-note").textContent = hidden ? `${hidden} event${hidden === 1 ? "" : "s"} without a person hidden.` : "";
+  $("#events").innerHTML = shown.map((ev) => {
+    const v = verdict(ev);
+    const img = ev.thumbnail ? `<img loading="lazy" src="/media/${esc(ev.id)}/${esc(ev.thumbnail)}" alt="">` : "";
+    return `<button class="card" type="button" data-id="${esc(ev.id)}">
+      <div class="thumb">${img}<span class="badge ${esc(v.cls)}">${esc(v.text)}</span></div>
+      <div class="meta"><strong>${esc(when(ev.time))}</strong><span>${esc(TRIGGERS[ev.trigger] || ev.trigger)}</span></div>
+    </button>`;
+  }).join("");
+}
+
+function renderStatus(st) {
+  const cam = st.camera;
+  const states = {
+    connected: ["ok", "Camera connected"], connecting: ["warn", "Connecting…"], starting: ["warn", "Starting…"],
+    needs_config: ["warn", "Needs setup"], error: ["bad", "Camera error"],
+  };
+  const [cls, text] = states[cam.state] || ["", cam.state];
+  $("#cam-dot").className = "dot " + cls;
+  $("#cam-text").textContent = text + (st.busy ? " · capturing" : "");
+
+  const trig = $("#trigger-chip");
+  trig.hidden = false;
+  trig.textContent = `Captures on: ${cam.trigger_on || st.settings.trigger_mode}`;
+  const ai = $("#ai-chip");
+  ai.hidden = false;
+  ai.textContent = st.analysis_enabled ? `AI: ${st.settings.model}` : "AI: no API key";
+
+  const banner = $("#banner");
+  banner.hidden = !cam.error;
+  banner.className = "banner" + (cam.state === "error" ? " bad" : "");
+  banner.textContent = cam.error || "";
+
+  $("#topics").innerHTML = cam.topics.length ? cam.topics.map((t) => `<li>${esc(t)}</li>`).join("") : "<li>(none reported yet)</li>";
+  $("#recent").innerHTML = cam.recent.map((r) =>
+    `<tr><td>${esc(r.time)}</td><td><code>${esc(r.topic)}</code></td><td>${esc(r.operation)}</td><td><code>${esc(JSON.stringify(r.data))}</code>${r.count > 1 ? ` <span class="note">×${r.count}</span>` : ""}</td></tr>`
+  ).join("") || `<tr><td colspan="4" class="note">Nothing received yet.</td></tr>`;
+}
+
+function openDetail(id) {
+  const ev = events.find((e) => e.id === id);
+  if (!ev) return;
+  openId = id;
+  const v = verdict(ev);
+  $("#dlg-title").textContent = `${when(ev.time)} · ${TRIGGERS[ev.trigger] || ev.trigger} · ${v.text}`;
+  const a = ev.analysis || {};
+  const perFrame = Object.fromEntries((a.frames || []).map((f) => [f.frame, f]));
+  let html = "";
+  if (ev.status === "capturing") html += `<p class="note">Taking pictures… this updates in a few seconds.</p>`;
+  else if (ev.thumbnail) html += `<img class="hero" src="/media/${esc(ev.id)}/${esc(ev.thumbnail)}" alt="">`;
+  if (ev.error) html += `<p class="err">${esc(ev.error)}</p>`;
+  if (a.label === "error" && a.error) html += `<p class="err">Decisions API: ${esc(a.error)}</p>`;
+  if (a.probabilities) {
+    html += `<div class="bars">` + Object.entries(a.probabilities).map(([k, p]) =>
+      `<span>${esc(LABELS[k] || k)}</span><div class="bar"><span class="${esc(k)}" style="width:${Math.round(p * 100)}%"></span></div><span>${pct(p)}</span>`
+    ).join("") + `</div>`;
+  }
+  if (a.person_probability != null) html += `<p class="note">Person visible (best frame): ${pct(a.person_probability)}</p>`;
+  if ((ev.frames || []).length) {
+    html += `<div class="frames">` + ev.frames.map((name) => {
+      const f = perFrame[name];
+      const probs = f && (f.probs || f.gender);
+      const probText = probs ? Object.entries(probs).filter(([k]) => k !== "unclear").map(([k, p]) => ` · ${esc((LABELS[k] || k).toLowerCase())} ${pct(p)}`).join("") : "";
+      const cap = f ? (f.error ? `<span class="err">${esc(f.error)}</span>` : `person ${pct(f.person)}` + probText + (f.refused ? " · refused" : "")) : "not analysed";
+      return `<figure class="${name === a.best_frame ? "best" : ""}"><a href="/media/${esc(ev.id)}/${esc(name)}" target="_blank"><img loading="lazy" src="/media/${esc(ev.id)}/${esc(name)}" alt=""></a><figcaption>${esc(name)} · ${cap}</figcaption></figure>`;
+    }).join("") + `</div>`;
+  }
+  $("#dlg-body").innerHTML = html;
+  if (!$("#detail").open) $("#detail").showModal();
+}
+
+async function refresh() {
+  try {
+    const [st, evs] = await Promise.all([fetch("/api/status").then((r) => r.json()), fetch("/api/events").then((r) => r.json())]);
+    renderStatus(st);
+    const key = JSON.stringify(evs);
+    if (key !== lastEventsKey) {
+      lastEventsKey = key;
+      const before = events.find((e) => e.id === openId);
+      events = evs;
+      renderEvents();
+      const after = events.find((e) => e.id === openId);
+      if (openId && after && JSON.stringify(before) !== JSON.stringify(after)) openDetail(openId);
+    }
+  } catch {
+    $("#cam-dot").className = "dot bad";
+    $("#cam-text").textContent = "Server not reachable";
+  }
+}
+
+try {
+  const saved = localStorage.getItem("peopleOnly");
+  if (saved !== null) $("#people-only").checked = saved === "1";
+} catch {}
+$("#people-only").addEventListener("change", () => {
+  try { localStorage.setItem("peopleOnly", $("#people-only").checked ? "1" : "0"); } catch {}
+  renderEvents();
+});
+$("#events").addEventListener("click", (e) => {
+  const card = e.target.closest(".card");
+  if (card) openDetail(card.dataset.id);
+});
+$("#dlg-close").addEventListener("click", () => $("#detail").close());
+$("#detail").addEventListener("close", () => { openId = null; $("#dlg-body").innerHTML = ""; });
+$("#dlg-delete").addEventListener("click", async () => {
+  if (!openId || !confirm("Delete this event and its pictures?")) return;
+  await fetch(`/api/events/${encodeURIComponent(openId)}`, { method: "DELETE" });
+  $("#detail").close();
+  refresh();
+});
+$("#live-btn").addEventListener("click", () => {
+  const live = $("#live"), img = $("#live-img");
+  live.hidden = !live.hidden;
+  img.src = live.hidden ? "" : "/live.mjpg?t=" + Date.now();
+  $("#live-btn").textContent = live.hidden ? "Live view" : "Hide live view";
+});
+$("#capture-btn").addEventListener("click", async () => {
+  const btn = $("#capture-btn");
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/events", { method: "POST" });
+    if (!r.ok) alert((await r.json()).detail || "Could not start a capture");
+    await refresh();
+  } finally {
+    setTimeout(() => (btn.disabled = false), 1500);
+  }
+});
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

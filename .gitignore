@@ -1,0 +1,6 @@
+.env
+decisionsapi.txt
+events/
+.venv/
+__pycache__/
+*.pyc
