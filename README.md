@@ -161,3 +161,7 @@ than about 10 seconds, and it marks every event update as `Initialized`. The app
   Don't expose it to a network without adding authentication.
 - Never commit `.env` or API keys. `.gitignore` already excludes `.env`,
   `decisionsapi.txt` and `events/`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
